@@ -1,40 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-// ─── STORAGE HELPERS ──────────────────────────────────────────────────────────
-async function load(key, fallback = null) {
-  try {
-    const r = await window.storage.get(key);
-    return r ? JSON.parse(r.value) : fallback;
-  } catch { return fallback; }
-}
-async function save(key, value) {
-  try { await window.storage.set(key, JSON.stringify(value)); } catch {}
-}
-
-// ─── SEED DATA (from your Excel) ─────────────────────────────────────────────
-const SEED_PROPERTIES = [
-  { id: "prop-1", name: "Casa El Paso", type: "Casa", color: "#e07b39" },
-  { id: "prop-2", name: "Departamento El Paso", type: "Departamento", color: "#3b82f6" },
-];
-const SEED_RESERVATIONS = [
-  { id:"r1", propId:"prop-2", guest:"Martin Broin",    phone:"",        checkIn:"2025-12-13", checkOut:"2025-12-16", price:248200, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r2", propId:"prop-2", guest:"Sonia Elizalde",  phone:"",        checkIn:"2025-12-18", checkOut:"2025-12-21", price:249050, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r3", propId:"prop-2", guest:"Marcos Mercado",  phone:"",        checkIn:"2025-12-29", checkOut:"2026-01-03", price:471250, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r4", propId:"prop-1", guest:"Carolina Passarrelo", phone:"",   checkIn:"2025-12-29", checkOut:"2026-01-03", price:535815, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r5", propId:"prop-2", guest:"Cecilia Perini",  phone:"",        checkIn:"2026-01-03", checkOut:"2026-01-05", price:180000, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r6", propId:"prop-1", guest:"Ruth Quintana",   phone:"",        checkIn:"2026-01-03", checkOut:"2026-01-05", price:200000, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r7", propId:"prop-2", guest:"Davis Ruben Dario", phone:"",     checkIn:"2026-01-05", checkOut:"2026-01-10", price:439500, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r8", propId:"prop-1", guest:"Graciela Asuad",  phone:"",        checkIn:"2026-01-05", checkOut:"2026-01-07", price:285675, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r9", propId:"prop-1", guest:"Marcos Cruz",     phone:"",        checkIn:"2026-01-08", checkOut:"2026-01-10", price:230100, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r10",propId:"prop-1", guest:"Monica Fernandez",phone:"",        checkIn:"2026-01-10", checkOut:"2026-01-13", price:345150, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r11",propId:"prop-2", guest:"Squetino Hilda",  phone:"",        checkIn:"2026-01-10", checkOut:"2026-01-12", price:180000, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r12",propId:"prop-2", guest:"Zulma Gregorio",  phone:"",        checkIn:"2026-01-12", checkOut:"2026-01-16", price:315000, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r13",propId:"prop-1", guest:"Facundo Villalba",phone:"",        checkIn:"2026-01-23", checkOut:"2026-01-25", price:229245, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r14",propId:"prop-2", guest:"Povarchuk Daiana",phone:"",        checkIn:"2026-01-25", checkOut:"2026-01-31", price:652500, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r15",propId:"prop-1", guest:"Ayelen Torres",   phone:"",        checkIn:"2026-01-30", checkOut:"2026-02-01", price:230690, commission:0.15, cleaning:30000, notes:"" },
-  { id:"r16",propId:"prop-2", guest:"Augusto",         phone:"",        checkIn:"2026-02-14", checkOut:"2026-02-18", price:360000, commission:0.15, cleaning:20000, notes:"" },
-  { id:"r17",propId:"prop-1", guest:"Pinat Maria Angeles",phone:"",     checkIn:"2026-02-13", checkOut:"2026-02-16", price:328545, commission:0.15, cleaning:30000, notes:"" },
-];
+const SUPABASE_URL = "https://ucbsblteymfclaeewxkk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjYnNibHRleW1mY2xhZWV3eGtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MzQwODgsImV4cCI6MjA4ODQxMDA4OH0.LBwcBvzFYiY7NGqEj7fT1HqEBJ-wut-LlL06fR2pygs";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat("es-AR", { style:"currency", currency:"ARS", maximumFractionDigits:0 }).format(n);
@@ -42,10 +11,18 @@ const dateStr = (d) => d.toISOString().slice(0,10);
 const addDays = (s, n) => { const d = new Date(s); d.setDate(d.getDate()+n); return dateStr(d); };
 const diffDays = (a, b) => Math.round((new Date(b)-new Date(a))/(86400000));
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const uid = () => "id-" + Math.random().toString(36).slice(2,9);
+const uid = () => crypto.randomUUID();
 
 function getDaysInMonth(year, month) {
   return new Date(year, month+1, 0).getDate();
+}
+
+// Map Supabase snake_case to camelCase
+function mapRes(r) {
+  return { id: r.id, propId: r.prop_id, guest: r.guest, phone: r.phone||"", checkIn: r.check_in, checkOut: r.check_out, price: r.price||0, commission: r.commission||0.15, cleaning: r.cleaning||0, notes: r.notes||"" };
+}
+function mapProp(p) {
+  return { id: p.id, name: p.name, type: p.type, color: p.color, address: p.address||"", notes: p.notes||"" };
 }
 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
@@ -63,7 +40,6 @@ function Modal({ title, onClose, children }) {
   );
 }
 
-// ─── FORM FIELD ───────────────────────────────────────────────────────────────
 function Field({ label, children }) {
   return (
     <div style={{marginBottom:"1rem"}}>
@@ -168,12 +144,10 @@ function CalendarView({ properties, reservations, onAddRes }) {
 
   const prevMonth = () => { if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1); };
   const nextMonth = () => { if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1); };
-
   const cellW = Math.max(28, Math.floor((window.innerWidth > 900 ? 800 : window.innerWidth - 80) / days));
 
   return (
     <div>
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:"1rem",marginBottom:"1.5rem",flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:".5rem"}}>
           <button onClick={prevMonth} style={{background:"#252d3f",border:"1px solid #2d3548",borderRadius:".5rem",color:"#f0f4ff",padding:".4rem .75rem",cursor:"pointer",fontSize:"1rem"}}>‹</button>
@@ -188,8 +162,6 @@ function CalendarView({ properties, reservations, onAddRes }) {
           + Nueva reserva
         </button>
       </div>
-
-      {/* Day headers */}
       <div style={{overflowX:"auto"}}>
         <div style={{minWidth: 200 + days * cellW}}>
           <div style={{display:"flex",marginBottom:4}}>
@@ -206,8 +178,6 @@ function CalendarView({ properties, reservations, onAddRes }) {
               );
             })}
           </div>
-
-          {/* Property rows */}
           {visProps.map(prop => (
             <div key={prop.id} style={{display:"flex",marginBottom:6,alignItems:"stretch"}}>
               <div style={{width:160,flexShrink:0,display:"flex",alignItems:"center",gap:".5rem",paddingRight:".75rem"}}>
@@ -221,26 +191,15 @@ function CalendarView({ properties, reservations, onAddRes }) {
                 const isToday = dateS===dateStr(today);
                 const isCheckIn = res?.checkIn === dateS;
                 const isCheckOut = !res && reservations.find(r=>r.propId===prop.id && r.checkOut===dateS);
-
                 return (
                   <div key={i} title={res ? `${res.guest}\n${res.checkIn} → ${res.checkOut}` : "Libre"}
-                    style={{
-                      width:cellW, flexShrink:0, height:32, borderRadius: isCheckIn?"6px 0 0 6px":"0",
-                      background: res ? prop.color+"cc" : isToday?"#252d3f":"#181f2e",
-                      border: isToday?"1px solid #3b82f6":"1px solid #252d3f",
+                    style={{width:cellW,flexShrink:0,height:32,borderRadius:isCheckIn?"6px 0 0 6px":"0",
+                      background:res?prop.color+"cc":isToday?"#252d3f":"#181f2e",
+                      border:isToday?"1px solid #3b82f6":"1px solid #252d3f",
                       display:"flex",alignItems:"center",justifyContent:"center",
-                      cursor: res?"pointer":"default",
-                      position:"relative",
-                      overflow:"hidden"
-                    }}>
-                    {isCheckIn && (
-                      <span style={{fontSize:".6rem",color:"#fff",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:cellW*3,paddingLeft:3,zIndex:1}}>
-                        {res.guest.split(" ")[0]}
-                      </span>
-                    )}
-                    {isCheckOut && !res && (
-                      <div style={{width:"50%",height:"100%",background:"#8896b322",marginLeft:"auto",borderLeft:"2px dashed #8896b3"}}/>
-                    )}
+                      cursor:res?"pointer":"default",position:"relative",overflow:"hidden"}}>
+                    {isCheckIn && <span style={{fontSize:".6rem",color:"#fff",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:cellW*3,paddingLeft:3,zIndex:1}}>{res.guest.split(" ")[0]}</span>}
+                    {isCheckOut && !res && <div style={{width:"50%",height:"100%",background:"#8896b322",marginLeft:"auto",borderLeft:"2px dashed #8896b3"}}/>}
                   </div>
                 );
               })}
@@ -248,8 +207,6 @@ function CalendarView({ properties, reservations, onAddRes }) {
           ))}
         </div>
       </div>
-
-      {/* Legend */}
       <div style={{marginTop:"1rem",display:"flex",gap:"1.5rem",flexWrap:"wrap"}}>
         {visProps.map(p=>(
           <div key={p.id} style={{display:"flex",alignItems:"center",gap:".4rem",fontSize:".8rem",color:"#8896b3"}}>
@@ -265,8 +222,6 @@ function CalendarView({ properties, reservations, onAddRes }) {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ properties, reservations }) {
   const now = new Date();
-  const monthStr = dateStr(now).slice(0,7);
-  const thisMonth = reservations.filter(r => r.checkIn.startsWith(monthStr));
   const totalIncome = reservations.reduce((a,r)=>a+r.price,0);
   const totalNet = reservations.reduce((a,r)=>a+(r.price*(1-r.commission)-(r.cleaning||0)),0);
   const totalNights = reservations.reduce((a,r)=>a+diffDays(r.checkIn,r.checkOut),0);
@@ -293,8 +248,6 @@ function Dashboard({ properties, reservations }) {
           </div>
         ))}
       </div>
-
-      {/* Per-property breakdown */}
       <div style={{background:"#1e2433",borderRadius:".75rem",padding:"1.25rem",border:"1px solid #2d3548",marginBottom:"1.5rem"}}>
         <h3 style={{margin:"0 0 1rem",color:"#f0f4ff",fontSize:"1rem"}}>Por propiedad</h3>
         <div style={{overflowX:"auto"}}>
@@ -335,8 +288,6 @@ function Dashboard({ properties, reservations }) {
           </table>
         </div>
       </div>
-
-      {/* Upcoming */}
       {upcoming.length > 0 && (
         <div style={{background:"#1e2433",borderRadius:".75rem",padding:"1.25rem",border:"1px solid #2d3548"}}>
           <h3 style={{margin:"0 0 1rem",color:"#f0f4ff",fontSize:"1rem"}}>Próximas entradas</h3>
@@ -416,7 +367,7 @@ function ReservationsList({ properties, reservations, onEdit, onDelete, onAdd })
               const now = dateStr(new Date());
               const status = r.checkOut <= now ? "past" : r.checkIn <= now ? "active" : "future";
               return (
-                <tr key={r.id} style={{borderBottom:"1px solid #1a2235",opacity: status==="past"?.7:1}}>
+                <tr key={r.id} style={{borderBottom:"1px solid #1a2235",opacity:status==="past"?.7:1}}>
                   <td style={{padding:".6rem .5rem"}}>
                     <span style={{display:"inline-flex",alignItems:"center",gap:".4rem",color:"#d0d8f0"}}>
                       <span style={{width:8,height:8,borderRadius:"50%",background:prop?.color||"#8896b3",display:"inline-block"}}/>
@@ -509,44 +460,78 @@ export default function App() {
   const [reservations, setReservations] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState("dashboard");
-  const [modal, setModal] = useState(null); // { type, data }
+  const [modal, setModal] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Load from storage
   useEffect(() => {
     (async () => {
-      const props = await load("rm:properties");
-      const res = await load("rm:reservations");
-      if (props) setProperties(props);
-      else { setProperties(SEED_PROPERTIES); await save("rm:properties", SEED_PROPERTIES); }
-      if (res) setReservations(res);
-      else { setReservations(SEED_RESERVATIONS); await save("rm:reservations", SEED_RESERVATIONS); }
+      try {
+        const { data: props, error: e1 } = await supabase.from("properties").select("*").order("created_at");
+        const { data: res, error: e2 } = await supabase.from("reservations").select("*").order("check_in");
+        if (e1 || e2) throw e1 || e2;
+        setProperties((props||[]).map(mapProp));
+        setReservations((res||[]).map(mapRes));
+      } catch(e) {
+        setError(e.message);
+      }
       setLoaded(true);
     })();
   }, []);
 
-  const saveProps = async (p) => { setProperties(p); await save("rm:properties", p); };
-  const saveRes = async (r) => { setReservations(r); await save("rm:reservations", r); };
-
   const handleSaveProp = async (prop) => {
-    const updated = properties.find(p=>p.id===prop.id) ? properties.map(p=>p.id===prop.id?prop:p) : [...properties, prop];
-    await saveProps(updated); setModal(null);
+    const dbProp = { id: prop.id, name: prop.name, type: prop.type, color: prop.color, address: prop.address, notes: prop.notes };
+    const exists = properties.find(p=>p.id===prop.id);
+    if (exists) {
+      await supabase.from("properties").update(dbProp).eq("id", prop.id);
+      setProperties(properties.map(p=>p.id===prop.id?prop:p));
+    } else {
+      await supabase.from("properties").insert(dbProp);
+      setProperties([...properties, prop]);
+    }
+    setModal(null);
   };
+
   const handleDeleteProp = async (id) => {
     if (!confirm("¿Eliminar esta propiedad?")) return;
-    await saveProps(properties.filter(p=>p.id!==id));
+    await supabase.from("properties").delete().eq("id", id);
+    setProperties(properties.filter(p=>p.id!==id));
   };
+
   const handleSaveRes = async (res) => {
-    const updated = reservations.find(r=>r.id===res.id) ? reservations.map(r=>r.id===res.id?res:r) : [...reservations, res];
-    await saveRes(updated); setModal(null);
+    const dbRes = { id: res.id, prop_id: res.propId, guest: res.guest, phone: res.phone, check_in: res.checkIn, check_out: res.checkOut, price: res.price, commission: res.commission, cleaning: res.cleaning, notes: res.notes };
+    const exists = reservations.find(r=>r.id===res.id);
+    if (exists) {
+      await supabase.from("reservations").update(dbRes).eq("id", res.id);
+      setReservations(reservations.map(r=>r.id===res.id?res:r));
+    } else {
+      await supabase.from("reservations").insert(dbRes);
+      setReservations([...reservations, res]);
+    }
+    setModal(null);
   };
+
   const handleDeleteRes = async (id) => {
     if (!confirm("¿Eliminar esta reserva?")) return;
-    await saveRes(reservations.filter(r=>r.id!==id));
+    await supabase.from("reservations").delete().eq("id", id);
+    setReservations(reservations.filter(r=>r.id!==id));
   };
 
   if (!loaded) return (
     <div style={{minHeight:"100vh",background:"#111827",display:"flex",alignItems:"center",justifyContent:"center",color:"#8896b3",fontFamily:"system-ui"}}>
-      Cargando datos...
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:"2rem",marginBottom:"1rem"}}>🏡</div>
+        <div>Cargando RentaManager...</div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{minHeight:"100vh",background:"#111827",display:"flex",alignItems:"center",justifyContent:"center",color:"#f87171",fontFamily:"system-ui",padding:"2rem",textAlign:"center"}}>
+      <div>
+        <div style={{fontSize:"2rem",marginBottom:"1rem"}}>⚠️</div>
+        <div style={{marginBottom:".5rem",fontWeight:700}}>Error de conexión con Supabase</div>
+        <div style={{fontSize:".85rem",color:"#8896b3"}}>{error}</div>
+      </div>
     </div>
   );
 
@@ -559,7 +544,6 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#111827",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",color:"#f0f4ff"}}>
-      {/* Sidebar/topbar */}
       <div style={{background:"#0d1117",borderBottom:"1px solid #1e2433",padding:".75rem 1.5rem",display:"flex",alignItems:"center",gap:"1rem",flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:".6rem",marginRight:"auto"}}>
           <span style={{fontSize:"1.3rem"}}>🏡</span>
@@ -572,24 +556,19 @@ export default function App() {
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{padding:".45rem .9rem",borderRadius:".5rem",border:"none",cursor:"pointer",fontSize:".85rem",fontWeight:600,
-                background: tab===t.id?"#3b82f6":"transparent",
-                color: tab===t.id?"#fff":"#8896b3"}}>
+                background:tab===t.id?"#3b82f6":"transparent",
+                color:tab===t.id?"#fff":"#8896b3"}}>
               {t.icon} {t.label}
             </button>
           ))}
         </nav>
       </div>
-
       <main style={{padding:"1.5rem",maxWidth:1200,margin:"0 auto"}}>
         {tab==="dashboard"    && <Dashboard properties={properties} reservations={reservations}/>}
         {tab==="calendar"     && <CalendarView properties={properties} reservations={reservations} onAddRes={()=>setModal({type:"res",data:null})}/>}
-        {tab==="reservations" && <ReservationsList properties={properties} reservations={reservations}
-            onEdit={r=>setModal({type:"res",data:r})} onDelete={handleDeleteRes} onAdd={()=>setModal({type:"res",data:null})}/>}
-        {tab==="properties"   && <PropertiesView properties={properties} reservations={reservations}
-            onAdd={()=>setModal({type:"prop",data:null})} onEdit={p=>setModal({type:"prop",data:p})} onDelete={handleDeleteProp}/>}
+        {tab==="reservations" && <ReservationsList properties={properties} reservations={reservations} onEdit={r=>setModal({type:"res",data:r})} onDelete={handleDeleteRes} onAdd={()=>setModal({type:"res",data:null})}/>}
+        {tab==="properties"   && <PropertiesView properties={properties} reservations={reservations} onAdd={()=>setModal({type:"prop",data:null})} onEdit={p=>setModal({type:"prop",data:p})} onDelete={handleDeleteProp}/>}
       </main>
-
-      {/* Modals */}
       {modal?.type==="res" && (
         <Modal title={modal.data ? "Editar reserva" : "Nueva reserva"} onClose={()=>setModal(null)}>
           <ReservationForm properties={properties} initial={modal.data} onSave={handleSaveRes} onClose={()=>setModal(null)}/>
