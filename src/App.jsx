@@ -222,9 +222,17 @@ function CalendarView({ properties, reservations, onAddRes }) {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ properties, reservations }) {
   const now = new Date();
-  const totalIncome = reservations.reduce((a,r)=>a+r.price,0);
-  const totalNet = reservations.reduce((a,r)=>a+(r.price*(1-r.commission)-(r.cleaning||0)),0);
-  const totalNights = reservations.reduce((a,r)=>a+diffDays(r.checkIn,r.checkOut),0);
+  // Evitar duplicar reservas "Ambos" (aparecen dos veces, una por propiedad)
+  const seen = new Set();
+  const uniqueRes = reservations.filter(r => {
+    const key = `${r.guest}-${r.checkIn}-${r.checkOut}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const totalIncome = uniqueRes.reduce((a,r)=>a+r.price,0);
+  const totalNet = uniqueRes.reduce((a,r)=>a+(r.price*(1-r.commission)-(r.cleaning||0)),0);
+  const totalNights = uniqueRes.reduce((a,r)=>a+diffDays(r.checkIn,r.checkOut),0);
   const upcoming = reservations.filter(r=>r.checkIn>dateStr(now)).sort((a,b)=>a.checkIn.localeCompare(b.checkIn)).slice(0,5);
   const active = reservations.filter(r=>r.checkIn<=dateStr(now)&&r.checkOut>dateStr(now));
 
@@ -232,7 +240,7 @@ function Dashboard({ properties, reservations }) {
     { label:"Ingresos totales", value: fmt(totalIncome), color:"#3b82f6", icon:"💰" },
     { label:"Ingreso neto", value: fmt(totalNet), color:"#10b981", icon:"📈" },
     { label:"Total noches", value: totalNights, color:"#8b5cf6", icon:"🌙" },
-    { label:"Reservas totales", value: reservations.length, color:"#f59e0b", icon:"📋" },
+    { label:"Reservas totales", value: uniqueRes.length, color:"#f59e0b", icon:"📋" },
     { label:"Propiedades", value: properties.length, color:"#e07b39", icon:"🏠" },
     { label:"Ocupadas ahora", value: active.length, color:"#ef4444", icon:"🔴" },
   ];
